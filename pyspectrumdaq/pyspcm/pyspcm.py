@@ -4,10 +4,10 @@ import sys
 from ctypes import *
 
 # load registers for easier access
-from pyspectrumdaq.Spectrum_M2i4931_pydriver.py_header.regs import *
+from .py_header.regs import *
 
 # load registers for easier access
-from pyspectrumdaq.Spectrum_M2i4931_pydriver.py_header.spcerr import *
+from .py_header.spcerr import *
 
 SPCM_DIR_PCTOCARD = 0
 SPCM_DIR_CARDTOPC = 1
