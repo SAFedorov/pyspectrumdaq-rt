@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1149</width>
-    <height>766</height>
+    <height>820</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -42,6 +42,10 @@ QComboBox::drop-down {
     border-top-right-radius: 5px;
     border-bottom-right-radius: 5px;
 }
+QComboBox::down-arrow {
+    image: url(&quot;rsc:down_arrow.png&quot;);
+	width: 8px;
+}
 QComboBox QAbstractItemView {
     background-color: rgb(245, 245, 245);
 }
@@ -52,15 +56,90 @@ QPushButton {
     border-radius: 5px;
     border-color: rgb(0, 0, 0);
     padding: 3px; 
-}</string>
+	min-width: 70;
+}
+
+QScrollBar:vertical {
+	border: none;
+	width: 15px;
+ }
+ QScrollBar::handle:vertical {
+	border: 1px solid black;
+	min-height: 20px;
+	background-color: rgb(245, 245, 245);
+ }
+QScrollBar::add-line:vertical,  QScrollBar::sub-line:vertical {
+ 	height: 0px;
+ }</string>
   </property>
-  <layout class="QHBoxLayout" name="horizontalLayout_2">
+  <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout">
-     <item>
-      <widget class="PlotWidget" name="spectrumPlot"/>
+    <layout class="QGridLayout" name="gridLayout_3">
+     <item row="0" column="0">
+      <widget class="PlotWidget" name="spectrumPlot">
+       <property name="contextMenuPolicy">
+        <enum>Qt::DefaultContextMenu</enum>
+       </property>
+      </widget>
      </item>
-     <item>
+     <item row="1" column="0">
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item alignment="Qt::AlignRight">
+        <widget class="QLabel" name="basedirLabel">
+         <property name="text">
+          <string>Base directory</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="basedirLineEdit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_6">
+         <property name="minimumSize">
+          <size>
+           <width>100</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>File format</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="fileFormatComboBox">
+         <property name="minimumSize">
+          <size>
+           <width>70</width>
+           <height>0</height>
+          </size>
+         </property>
+         <item>
+          <property name="text">
+           <string>hdf5</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>txt</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item row="0" column="1" rowspan="2">
+      <widget class="Line" name="line">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="2" rowspan="2">
       <widget class="QWidget" name="widget" native="true">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
@@ -70,44 +149,47 @@ QPushButton {
        </property>
        <property name="minimumSize">
         <size>
-         <width>200</width>
+         <width>270</width>
          <height>0</height>
         </size>
        </property>
        <property name="maximumSize">
         <size>
-         <width>250</width>
+         <width>270</width>
          <height>16777215</height>
         </size>
        </property>
        <layout class="QGridLayout" name="gridLayout_2">
-        <item row="6" column="0">
-         <spacer name="verticalSpacer_3">
-          <property name="orientation">
-           <enum>Qt::Vertical</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>20</width>
-            <height>40</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item row="0" column="0">
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <property name="spacing">
+         <number>7</number>
+        </property>
+        <item row="0" column="1">
          <layout class="QGridLayout" name="gridLayout">
           <property name="sizeConstraint">
            <enum>QLayout::SetFixedSize</enum>
           </property>
-          <item row="4" column="0" alignment="Qt::AlignRight">
-           <widget class="QLabel" name="label_5">
+          <property name="spacing">
+           <number>7</number>
+          </property>
+          <item row="7" column="0" alignment="Qt::AlignRight">
+           <widget class="QLabel" name="fullrangeLabel">
             <property name="text">
-             <string>RBW (Hz)</string>
+             <string>Full range (V)</string>
             </property>
            </widget>
           </item>
-          <item row="8" column="1">
-           <spacer name="verticalSpacer_2">
+          <item row="12" column="0" alignment="Qt::AlignRight">
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string>Completed</string>
+            </property>
+           </widget>
+          </item>
+          <item row="15" column="1">
+           <spacer name="verticalSpacer_3">
             <property name="orientation">
              <enum>Qt::Vertical</enum>
             </property>
@@ -119,28 +201,41 @@ QPushButton {
             </property>
            </spacer>
           </item>
+          <item row="9" column="1">
+           <widget class="QComboBox" name="trigmodeComboBox">
+            <property name="maximumSize">
+             <size>
+              <width>100</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <item>
+             <property name="text">
+              <string>Software</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>External</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="samplerateLineEdit">
+            <property name="maximumSize">
+             <size>
+              <width>100</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>30e6</string>
+            </property>
+           </widget>
+          </item>
           <item row="7" column="1">
            <widget class="QComboBox" name="fullrangeComboBox">
-            <item>
-             <property name="text">
-              <string>0.2</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>0.5</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>1</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>2</string>
-             </property>
-            </item>
             <item>
              <property name="text">
               <string>5</string>
@@ -151,6 +246,13 @@ QPushButton {
               <string>10</string>
              </property>
             </item>
+           </widget>
+          </item>
+          <item row="5" column="0" alignment="Qt::AlignRight">
+           <widget class="QLabel" name="channelLabel">
+            <property name="text">
+             <string>Channel</string>
+            </property>
            </widget>
           </item>
           <item row="6" column="1">
@@ -167,29 +269,40 @@ QPushButton {
             </item>
            </widget>
           </item>
-          <item row="11" column="1">
-           <widget class="QLineEdit" name="naveragesLineEdit">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>100</width>
-              <height>16777215</height>
-             </size>
-            </property>
+          <item row="2" column="0" alignment="Qt::AlignRight">
+           <widget class="QLabel" name="nsamplesLabel">
             <property name="text">
-             <string>100</string>
+             <string>N samples</string>
             </property>
            </widget>
           </item>
-          <item row="6" column="0" alignment="Qt::AlignRight">
-           <widget class="QLabel" name="terminationLabel">
+          <item row="19" column="1">
+           <widget class="QSpinBox" name="navgrtSpinBox">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The number of averages for the real-time display&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="prefix">
+             <string/>
+            </property>
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>1000000</number>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0" alignment="Qt::AlignRight">
+           <widget class="QLabel" name="label_5">
             <property name="text">
-             <string>Termination</string>
+             <string>RBW (Hz)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="12" column="1">
+           <widget class="QLabel" name="averagesCompletedLabel">
+            <property name="text">
+             <string>0</string>
             </property>
            </widget>
           </item>
@@ -200,28 +313,73 @@ QPushButton {
             </property>
            </widget>
           </item>
-          <item row="17" column="0" alignment="Qt::AlignRight">
+          <item row="13" column="1">
+           <widget class="QPushButton" name="averagePushButton">
+            <property name="text">
+             <string>Average</string>
+            </property>
+           </widget>
+          </item>
+          <item row="19" column="0" alignment="Qt::AlignRight">
            <widget class="QLabel" name="label_4">
             <property name="text">
              <string>Display averages</string>
             </property>
            </widget>
           </item>
-          <item row="1" column="1">
-           <widget class="QLineEdit" name="samplerateLineEdit">
-            <property name="maximumSize">
-             <size>
-              <width>100</width>
-              <height>16777215</height>
-             </size>
-            </property>
+          <item row="11" column="0" alignment="Qt::AlignRight">
+           <widget class="QLabel" name="label_2">
             <property name="text">
-             <string>30e6</string>
+             <string>N averages</string>
             </property>
            </widget>
           </item>
           <item row="10" column="1">
            <spacer name="verticalSpacer">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item row="14" column="0" colspan="2" alignment="Qt::AlignRight">
+           <widget class="QListWidget" name="traceListWidget">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Hotkeys:&lt;br/&gt;  Ctrl+x - hide/show trace &lt;br/&gt;  Ctr+s - save selected&lt;br/&gt;  Del - delete selected&lt;/p&gt;&lt;p&gt;The text color changes when the trace is saved.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <item>
+             <property name="text">
+              <string>Trace 1</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Background</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Background without input</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QComboBox" name="nsamplesComboBox">
+            <item>
+             <property name="text">
+              <string>2,048</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="18" column="1">
+           <spacer name="verticalSpacer_2">
             <property name="orientation">
              <enum>Qt::Vertical</enum>
             </property>
@@ -269,114 +427,6 @@ QPushButton {
             </item>
            </widget>
           </item>
-          <item row="14" column="1">
-           <widget class="QPushButton" name="clearPushButton">
-            <property name="text">
-             <string>Clear</string>
-            </property>
-           </widget>
-          </item>
-          <item row="13" column="1">
-           <widget class="QPushButton" name="averagePushButton">
-            <property name="text">
-             <string>Average</string>
-            </property>
-           </widget>
-          </item>
-          <item row="15" column="1">
-           <spacer name="verticalSpacer_4">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>20</width>
-              <height>40</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-          <item row="4" column="1">
-           <widget class="QLabel" name="rbwLabel">
-            <property name="text">
-             <string>700</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="1">
-           <widget class="QComboBox" name="nsamplesComboBox">
-            <item>
-             <property name="text">
-              <string>2,048</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>4,096</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>8,192</string>
-             </property>
-            </item>
-           </widget>
-          </item>
-          <item row="2" column="0" alignment="Qt::AlignRight">
-           <widget class="QLabel" name="nsamplesLabel">
-            <property name="text">
-             <string>N samples</string>
-            </property>
-           </widget>
-          </item>
-          <item row="12" column="1">
-           <widget class="QLabel" name="averagesCompletedLabel">
-            <property name="text">
-             <string>0</string>
-            </property>
-           </widget>
-          </item>
-          <item row="5" column="0" alignment="Qt::AlignRight">
-           <widget class="QLabel" name="channelLabel">
-            <property name="text">
-             <string>Channel</string>
-            </property>
-           </widget>
-          </item>
-          <item row="9" column="1">
-           <widget class="QComboBox" name="trigmodeComboBox">
-            <property name="maximumSize">
-             <size>
-              <width>16777215</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <item>
-             <property name="text">
-              <string>Software</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>External</string>
-             </property>
-            </item>
-           </widget>
-          </item>
-          <item row="12" column="0" alignment="Qt::AlignRight">
-           <widget class="QLabel" name="label_3">
-            <property name="text">
-             <string>Completed</string>
-            </property>
-           </widget>
-          </item>
-          <item row="11" column="0" alignment="Qt::AlignRight">
-           <widget class="QLabel" name="label_2">
-            <property name="text">
-             <string>N averages</string>
-            </property>
-           </widget>
-          </item>
           <item row="9" column="0" alignment="Qt::AlignRight">
            <widget class="QLabel" name="label">
             <property name="text">
@@ -384,49 +434,89 @@ QPushButton {
             </property>
            </widget>
           </item>
-          <item row="7" column="0" alignment="Qt::AlignRight">
-           <widget class="QLabel" name="fullrangeLabel">
+          <item row="4" column="1">
+           <widget class="QLabel" name="rbwLabel">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The spacing between the Fourier transform frequency bins.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
-             <string>Full range (V)</string>
+             <string>700</string>
             </property>
            </widget>
           </item>
-          <item row="17" column="1">
-           <widget class="QLineEdit" name="navgrtLineEdit">
+          <item row="6" column="0" alignment="Qt::AlignRight">
+           <widget class="QLabel" name="terminationLabel">
+            <property name="text">
+             <string>Termination</string>
+            </property>
+           </widget>
+          </item>
+          <item row="11" column="1">
+           <widget class="QLineEdit" name="naveragesLineEdit">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="maximumSize">
              <size>
               <width>100</width>
               <height>16777215</height>
              </size>
             </property>
-            <property name="toolTip">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The number of averages for the real-time trace.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-            </property>
-            <property name="whatsThis">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-            </property>
             <property name="text">
-             <string>1</string>
+             <string>100</string>
+            </property>
+           </widget>
+          </item>
+          <item row="17" column="0" colspan="2">
+           <widget class="PlotWidget" name="scopePlot">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>200</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>200</height>
+             </size>
+            </property>
+           </widget>
+          </item>
+          <item row="20" column="1">
+           <widget class="QComboBox" name="psdwindowComboBox">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Rectangular corresponds to no window.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <item>
+             <property name="text">
+              <string>Hann</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Rectangular</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="20" column="0" alignment="Qt::AlignRight">
+           <widget class="QLabel" name="label_7">
+            <property name="text">
+             <string>Window function</string>
             </property>
            </widget>
           </item>
          </layout>
-        </item>
-        <item row="7" column="0">
-         <widget class="PlotWidget" name="scopePlot">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>16777215</width>
-            <height>200</height>
-           </size>
-          </property>
-         </widget>
         </item>
        </layout>
       </widget>

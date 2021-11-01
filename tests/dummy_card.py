@@ -60,13 +60,24 @@ class DummyCard:
 
         dt_trace = ns / sr  # The sampling time of one trace (seconds).
 
+        # The frequency of the sinusoidal signal. Set between the fft frequency 
+        # bins in order to check spectral leakage.
+        df = sr / ns
+        sig_freq = self.samplerate // 10 + df / 2.3
+
+        sig = np.zeros((ns, self.nchannels), dtype=np.complex128)
+        sig[:, 0] = 1e3 * np.exp(1j * sig_freq * np.linspace(0, ns / sr, ns))
+
         cnt = 0  # The trace counter.
 
         start_time = time.time()
+        now = start_time
+
         while True:
 
             # The output is a white noise process.
-            data = (random((ns, self.nchannels)) - 0.5) * np.sqrt(sr / 30e6)
+            data = (random((ns, self.nchannels)) - 0.5)  #* np.sqrt(sr / 30e6) 
+                    #+ np.real(sig * np.exp(1j * sig_freq * now)))
 
             cnt += 1
 

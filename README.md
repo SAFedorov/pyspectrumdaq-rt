@@ -1,7 +1,13 @@
 # pyspectrumdaq
 Acquire data from the Spectrum M2 DAQ cards. This module supports internal and external triggering, multi-channel acquisition, etc. Easy to use and fast by default.
 
-Tested with M2i.4931-Exp.
+Requirements:
+* numba
+* pyqtgraph
+* pyfftw
+* h5py
+
+Tested with M2i.4931-Exp and pyqtgraph 0.11.0.
 
 A simple multi-channel usage example:
 
@@ -37,10 +43,11 @@ with Card() as adc:
                         samplerate=10**6)             
     adc.set_trigger(mode="soft")
 
-    lim = 100  # We want to acquire 100 traces and stop.
+    # Acquires 100 traces with no missed samples between them.
+    data_list = [data[:, 0] for data in adc.fifo(100)]
 
-    for cnt, data in enumerate(adc.fifo()):
-        process(data)
-        if cnt >= lim:
-            break
+    # Starts an infinite data acquisition loop.
+    for data in adc.fifo():
+        # Here data can be processed in real time.
+        pass
 ```

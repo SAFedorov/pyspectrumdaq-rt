@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import time
 
 with Card() as adc:
-    sr = 10**6
-    ns = 20 * 4096
+    sr = 30 * 10**6
+    ns = 409600
 
     adc.set_acquisition(channels=[1], 
                         terminations=["1M"], 
@@ -15,10 +15,10 @@ with Card() as adc:
                         samplerate=sr)             
     adc.set_trigger(mode="soft")
 
-    t = [i/sr for i in range(ns)]  # Calculates the time axis.
-    data = [0 for i in range(ns)]
+    ntraces = 40  # The number of traces to acquire.
+    dstime = ns * ntraces / adc.samplerate  # The total pure duration of data.
+    t = [i/adc.samplerate for i in range(ns)]  # The time axis.
 
-    ntraces = 40  # We want to acquire this number of traces and stop.
     startt = time.time()
 
     data_list = []
@@ -28,7 +28,6 @@ with Card() as adc:
 
 endt = time.time()
 
-dstime = ns * ntraces / sr
 readtime = endt - startt
 print(f"The time of data sampling: {dstime}")
 print(f"The total data reading time: {readtime}")

@@ -1,4 +1,4 @@
-from typing import Generator, Sequence
+from typing import Generator, Sequence, Union
 
 from ctypes import byref
 from ctypes import c_void_p
@@ -177,13 +177,15 @@ class Card:
                         samplerate: int = 30e6,
                         nsamples: int = 300e3,
                         timeout: float = 10,
+                        clock: str = "int",
+                        ext_clock_freq: Union[int, None] = None,
                         pretrig_ratio: float = 0) -> None:
         """Sets acquisition parameters and initializes an appropriate buffer
         for data transfer.
 
         Args:
             mode: 
-                The card mode. Can take one of the following values:
+                The acquisition mode. Can take one of the following values:
                 'std_single'  - A single data segment is acquired for a single 
                 trigger;
                 'fifo_single' - The specified number (maybe infinite) of
@@ -192,30 +194,43 @@ class Card:
                 'fifo_multi'  - The specified number (maybe infinite) of 
                 segments are acquired each after its own trigger event.
             channels:
-                Specify channel number as e.g. 0, 1, 2 or 3.
+                A list of enabled channels, e.g. [0, 2]. The channel enumeration 
+                starts from zero. 
             fullranges:
-                The fullranges of channels in V. Have to be one of 
+                The fullranges of the channels in Volts. Have to be one of 
                 {0.2, 0.5, 1, 2, 5, 10}.
             terminations:
-                The channel terminations, can be '50' (50 Ohm) or '1M' (1 MOhm).
+                The terminations of the channels, can be '50' (meaning 50 Ohm) 
+                or '1M' (meaning 1 MOhm).
             samplerate: 
-                The sample rate in Hz.
+                The sampling rate in Hz.
             nsamples:
                 The number of samples per channel per data trace.
             timeout: 
                 The timeout in s.
+            clock:
+                The clock source. Can be 'int' ('internal') or 'ext' 
+                ('external'). In the external mode, the external clock frequency 
+                must also be specified.
+            ext_clock_freq:
+                The external clock frequency in Hertz. Ignored if the clock is 
+                set to internal.
             pretrig_ratio:
                 The fraction of samples in a trace that is recorded prior to 
                 the trigger edge. 
         """
 
+        mode = mode.lower()
         nsamples = int(nsamples)
         samplerate = int(samplerate)
-        mode = mode.lower()
+        clock = clock.lower()
 
         # Enables and configures the specified channels and sets the card mode.
         self._set_channels(channels, terminations, fullranges)
-        self._set_card_mode(mode)
+        
+        # Sets the card mode.
+        self.set32(sp.SPC_CARDMODE, getattr(sp, "SPC_REC_%s" % mode.upper()))
+        self._card_mode = mode
 
         if mode == "std_single":
 
@@ -256,8 +271,22 @@ class Card:
 
         self._nsamples = nsamples
 
-        # Sets the sampling rate and reads it back, because the card can round 
-        # this number without giving an error.
+        # Sets the clock source before setting the sampling rate.
+        if clock.startswith("int"):
+
+            # Internal clock.
+            self.set32(sp.SPC_CLOCKMODE, sp.SPC_CM_INTPLL)
+        elif clock.startswith("ext"):
+
+            # External clock.
+            self.set32(sp.SPC_REFERENCECLOCK, int(ext_clock_freq))
+            self.set32(sp.SPC_CLOCKMODE, sp.SPC_CM_EXTREFCLOCK)
+        else:
+            raise ValueError("The clock mode must be 'int' or 'ext', "
+                             f"not {clock!r}")
+
+        # Sets the sampling rate and reads it back, because the card can adjust 
+        # this number based on the clock frequency without giving an error.
         self.set64(sp.SPC_SAMPLERATE, samplerate)
         self._samplerate = self.get64(sp.SPC_SAMPLERATE)
 
@@ -276,7 +305,7 @@ class Card:
         # Sets the timeout value after converting it to milliseconds.
         self.set32(sp.SPC_TIMEOUT, int(timeout * 1e3))
 
-        # Creates an appropriate buffer for DMA transfer.
+        # Creates a memory buffer for DMA transfer.
         self._create_buffer(len(channels), nsamples, mode)
 
     def set_trigger(self, mode: str = "soft", channel: int = 0,
@@ -489,24 +518,6 @@ class Card:
             # Waits for a new segment of data in the buffer.
             self.set32(sp.SPC_M2CMD, sp.M2CMD_DATA_WAITDMA)
 
-    def set_clock(self, mode: str = "int", ext_freq: int = 10000000) -> None:
-        """Sets the clock mode, which can be internal ('int') or 
-        external ('ext'). For external mode, an external clock frequency 
-        must be specified (in Hertz).
-        """
-
-        mode = mode.lower()  # The argument is case-insensitive.
-
-        if mode.startswith("int"):
-            self.set32(sp.SPC_CLOCKMODE, sp.SPC_CM_INTPLL)  # Internal clock.
-        elif mode.startswith("ext"):
-            # Sets the clock to external reference.
-            self.set32(sp.SPC_REFERENCECLOCK, int(ext_freq))
-            self.set32(sp.SPC_CLOCKMODE, sp.SPC_CM_EXTREFCLOCK)
-        else:
-            raise ValueError(f"The clock mode must be 'int' or 'ext', "
-                             f"not {mode!r}")
-
     @property
     def samplerate(self):
         """The sampling rate of input readings. The value of this property 
@@ -520,28 +531,6 @@ class Card:
         this property is set using `set_acquisition`.
         """
         return self._nsamples
-
-    def _set_card_mode(self, mode: str) -> None:
-        """Sets the card mode. The valid values are:
-
-        'std_single', 'std_multi', 'std_gate', 'std_aba',
-        'fifo_single', 'fifo_multi', 'fifo_gate', 'fifo_aba'
-
-        The argument is case-insensitive.
-        """
-
-        # Checks the consistency of the argument value.
-        mode = mode.lower()
-        valid_modes = ['std_single', 'std_multi', 'std_gate', 'std_aba',
-                       'fifo_single', 'fifo_multi', 'fifo_gate', 'fifo_aba']
-        if mode not in valid_modes:
-            raise ValueError(f"The mode must be one of the "
-                             f"following: {valid_modes}, not {mode!r}.")
-
-        # Sets the card mode.
-        mode_val = getattr(sp, "SPC_REC_%s" % mode.upper())
-        self.set32(sp.SPC_CARDMODE, mode_val)
-        self._card_mode = mode
 
     def _set_channels(self,
                       channels: Sequence = (1,),
