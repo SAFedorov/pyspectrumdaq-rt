@@ -12,16 +12,16 @@ from pyqtgraph.Qt import QtWidgets
 
 class TraceList:
     """A class that manages a combination of a list widget, pyqtgraph plot
-    and directory edit field to color traces, edit their names,
+    and directory edit field to plot traces, edit their names,
     hide/show them from the display and save their data in txt or hdf5 files.
 
     Traces are dictionaries that have 1D arrays of data under "x" and "y" keys 
-    plus optional metadata entries under other keys. Metadata can be any 
-    serializable objects, possibly nested.
+    plus optional metadata under other keys. Metadata can be any serializable  
+    objects, possibly nested.
     """
 
     def __init__(self, listWidget, plotItem, dirLineEdit) -> None:
-        """Inits a list and links interactive controls to it.
+        """Inits a list with interactive controls.
 
         Args:
             listWidget (QListWidget): 
@@ -42,6 +42,7 @@ class TraceList:
         self._list = []
 
         self._trace_colors = ((0, 0, 0),  # black
+                              (159,216,65),  # green
                               (42, 75, 186),  # dark blue
                               (66, 127, 245),  # blue
                               (111, 181, 207),  # greenish-blue
@@ -66,9 +67,9 @@ class TraceList:
         Args:
             tr: 
                 The dictionary to be appended to the list. Has to contain two
-                arrays of the same size under the 'x' and 'y' keys.
+                1D numeric arrays of the same size under the 'x' and 'y' keys.
             name: 
-                The name of the trace.
+                The initial name of the trace to be displayed in the list.
         """
 
         # Creates a new list item.
@@ -153,7 +154,11 @@ class TraceList:
             self._color_ind -= 1
 
     def save_selected(self, fmt: str = "txt"):
-        """Saves the currently selected trace."""
+        """Saves the currently selected trace.
+        
+        Args:
+            fmt ('txt' or 'hdf5'): The saving format.
+        """
 
         d = self._selected_item()
         if not d:

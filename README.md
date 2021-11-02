@@ -1,13 +1,26 @@
 # pyspectrumdaq
-Acquire data from the Spectrum M2 DAQ cards. This module supports internal and external triggering, multi-channel acquisition, etc. Easy to use and fast by default.
 
-Requirements:
+A package for data acquisition using Spectrum M2 digitizer cards.
+Supports multi-channel acquisition, external triggering, continuous
+data streaming etc.
+
+Includes a real-time spectrum analyzer app with a Qt UI.
+
+## Requirements
+
+Console usage requires:
+
+* numpy
 * numba
+
+The spectrum analyzer app, in addition, requires:
 * pyqtgraph
 * pyfftw
 * h5py
 
-Tested with M2i.4931-Exp and pyqtgraph 0.11.0.
+The package is tested with a M2i.4931-Exp card and pyqtgraph 0.11.0.
+
+## Usage examples
 
 A simple multi-channel usage example:
 
@@ -28,16 +41,17 @@ with Card() as adc:
     data = adc.acquire()
     # data now contains a float64 NumPy array, shaped as [nsamples, nchannels]
 
-    t = [i/adc.samplerate for i in range(ns)]  # Calculates the time axis.
+    # The time stamps for the data record are calculated as
+    t = [i/adc.samplerate for i in range(ns)] 
 ```
 
-An example of using the card in FIFO mode with a single trigger:
+An example of using the card in FIFO mode for real-time data streaming:
 ```python
 with Card() as adc:
     adc.set_acquisition(mode = "fifo_single", 
-                        channels=[0, 1], 
-                        terminations=["1M", "1M"], 
-                        fullranges=[2, 2],
+                        channels=[0], 
+                        terminations=["1M"], 
+                        fullranges=[2],
                         pretrig_ratio=0, 
                         nsamples=10**6,
                         samplerate=10**6)             
@@ -48,6 +62,16 @@ with Card() as adc:
 
     # Starts an infinite data acquisition loop.
     for data in adc.fifo():
-        # Here data can be processed in real time.
         pass
+```
+
+Starting the spectrum analyzer app:
+```python
+from pyspectrumdaq import rts
+
+if __name__ == "__main__":
+    # The spectrum analyzer uses multiprocessing, so the
+    # if __name__ == "__main__" idiom is required.
+
+    rts(basedir="home", acq_settings={"clock": "ext", "ext_clock_freq"=10**7})
 ```

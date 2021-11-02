@@ -30,15 +30,15 @@ from .card import Card
 
 TDSF = 100  # The shrinking factor for time-domain data.
 
-COMM_POLL_INTVL = 0.5  # The period (in seconds) with which the data acquisition 
+COMM_POLL_INTVL = 0.5  # The period (in seconds) with which the data acquisition
                        # process checks if new settings were supplied from 
                        # the user interface. This number should be large,
                        # because polling the pipe connection is time-consuming,
                        # but it should also ensure a reasonably fast response 
                        # to user actions.
 
-RT_NOTIF_INTVL = 15  # The notification interval (seconds) about the lag of data 
-                   # processing behind the real time.
+RT_NOTIF_INTVL = 15  # The notification interval (seconds) about the lag of data
+                     # processing behind the real time.
 
 LBUFF_MIN = 2  # The minimum number of traces in the interprocess buffer.
                # It makes sense to set this number to 2 because, on the one 
@@ -52,13 +52,56 @@ LBUFF_MAX = 20  # The maximum number of traces in the interprocess buffer.
                 # 5 and 20 should not make a big difference.
 
 
-def daq_loop(card_args: list, conn, buff, buff_acc, buff_t, cnt, navg, navg_completed) -> None:
-    """A loop for continuous data acquisition and Fourier-transforming of data
-    from a card. Executed in a separate process.
-    """
-    ns = None
+def daq_loop(card_args: Sequence,
+             conn, buff, buff_acc, buff_t, cnt, navg, navg_completed) -> None:
+    """A function executed in an independent process that continuously acquires 
+    data from a card and Fourier-transforms it.
 
-    with Card(*card_args) as adc:    
+    The data is passed to the user interface via a set of array buffers.
+    `buff` and `buff_t` are filled continuously with new specra and time domain
+    traces, respectively; these traces are plotted by the user interface process
+    as a real-time display. Because the UI can only display a limited 
+    number of traces per second, the spectra in `buff` are averged a constant 
+    number of times, `navg_rt`, which is set among other settings through 
+    the pipe.
+
+    There is an additional independent accumilator buffer `buff_acc` that
+    is used for user-defined averaging. The buffer simply accumulates spectra 
+    untill the count matches or exceeds `navg` set by the UI process. 
+    Unlike the display buffer `buff`, the normalization of data in `buff_acc` 
+    is done by the UI process. This implementation may appear inconsistent 
+    at first, but it has the explanation in that it is the UI process 
+    that is responsible for keeping track of the averging in this case. 
+
+    Args:
+        card_args:
+            The list of arguments to be supplied to the card constructor.
+        conn:
+            A pipe connection over which the process receives updated 
+            acquisition settings from the user interface process.
+        buff (List[Array]):
+            A list of shared memory arrays used as a circular buffer for 
+            real-time spectral data transfer.
+        buff_acc (Array):
+            A sared memory array sized for one trace that is used as 
+            an accumulator for user-defined averaging.
+        buff_t (List[Array]):
+            A list of shared memory arrays to transfer a reduced amount of
+            time-domain data. 
+        cnt (Value):
+            A shared variable that counts acquired fast-averaged traces for
+            the real-time display.
+        navg (Value):
+            A shared variable that sets the target number of user-defined 
+            averages for buff_acc. It is read-only for the daq process.
+        navg_completed (Value):
+            A shared variable that counts the current number of completed 
+            averages for buff_acc.
+    """
+
+    ns = None  # Current number of samples.
+
+    with Card(*card_args) as adc:
         while True:
             msg = conn.recv()
 
@@ -71,15 +114,18 @@ def daq_loop(card_args: list, conn, buff, buff_acc, buff_t, cnt, navg, navg_comp
             is_window = (settings.pop("window") == "Hann")
             navg_rt = settings.pop("navg_rt")
             trig_mode = settings.pop("trig_mode")
-            lbuff = settings.pop("lbuff")  # The size of the interprocess buffer 
+            
+            lbuff = settings.pop("lbuff")  # The size of the interprocess buffer
                                            # in traces. It controls the maximum
-                                           # delay between the processes.
+                                           # delay between the daq and UI
+                                           # processes.
 
             adc.reset()
-            
+
             adc.set_acquisition(**settings)
             adc.set_trigger(trig_mode)
 
+            # Sends the true values of the parameters back to the UI.
             conn.send({"samplerate": adc.samplerate, "nsamples": adc.nsamples})
 
             if adc.nsamples != ns:
@@ -87,29 +133,32 @@ def daq_loop(card_args: list, conn, buff, buff_acc, buff_t, cnt, navg, navg_comp
 
                 ns = adc.nsamples
                 nf = ns // 2 + 1  # The number of frequency bins.
-                nst = ns // TDSF  # The number of samples in the time-domain trace.
+                nst = ns // TDSF  # The reduced time-domain trace size.
 
-                npbuff = [np.ndarray((nf,), dtype=np.float64, buffer=a.get_obj()) for a in buff]
-                npbuff_acc = np.ndarray((nf,), dtype=np.float64, buffer=buff_acc)
-                npbuff_t = [np.ndarray((nst,), dtype=np.float64, buffer=a) for a in buff_t]
+                npbuff = [np.ndarray((nf,), dtype=np.float64,
+                                     buffer=a.get_obj()) for a in buff]
+                npbuff_acc = np.ndarray((nf,), dtype=np.float64,
+                                        buffer=buff_acc)
+                npbuff_t = [np.ndarray((nst,), dtype=np.float64, buffer=a)
+                            for a in buff_t]
 
                 # Auxiliary arrays for the calcualtion of FFT.
                 a = empty_aligned(2 * (nf - 1), dtype="float64")
                 b = empty_aligned(nf, dtype="complex128")
-                
+
                 calc_fft = FFTW(a, b, flags=["FFTW_ESTIMATE"])
-                # Using FFTW_ESTIMATE flag significantly reduces startup time 
+                # Setting FFTW_ESTIMATE flag significantly reduces startup time
                 # with little to no reduction in FFT speed in our case.
-                
-                # A buffer to store absolute squared spectra.
+
+                # An array to store absolute squared spectra.
                 y = np.empty(nf, dtype=np.float64)
 
-                # The Hann window function w[n] = sin(pi*n/N)^2.
+                # The Hann window function: w[n] = sqrt(8/3) * sin(pi*n/N)^2.
                 w = np.sin(np.linspace(0, np.pi, ns, endpoint=False)) ** 2
                 w = w * np.sqrt(8 / 3)
 
-            j = 0  # The fast accumulation counter.
-            cnt.value = 0  # The number of acquired traces, each of which 
+            j = 0  # The averaging counter for the real-time buffer traces.
+            cnt.value = 0  # The counter of acquired traces, each of which
                            # is averaged over navg_rt.
 
             navg_completed.value = 0
@@ -118,9 +167,9 @@ def daq_loop(card_args: list, conn, buff, buff_acc, buff_t, cnt, navg, navg_comp
             dt_trace = ns / sr  # The duration of one trace (seconds).
 
             n_comm_poll = max(int(COMM_POLL_INTVL / dt_trace / navg_rt), 1)
-            # Polling the connection is time consuming, and also it breaks 
-            # if polled too frequently, so we only poll once every
-            # n_comm_poll * navg_rt traces.
+            # Checking the connection is time consuming, and also the connection
+            # can break if polled too frequently, so we only poll it once every
+            # COMM_POLL_INTVL seconds or more rarely.
 
             tstart = time()
             prev_not_time = tstart  # The last time of notification about
@@ -135,7 +184,7 @@ def daq_loop(card_args: list, conn, buff, buff_acc, buff_t, cnt, navg, navg_comp
                 calc_fft()
                 calc_psd(y, b)
 
-                # Adds the trace to the accumulator buffer, which is independent of the fast averaging.
+                # Adds the trace to the user accumulator buffer.
                 if navg_completed.value < navg.value:
                     if navg_completed.value == 0:
                         npbuff_acc[:] = y
@@ -144,7 +193,7 @@ def daq_loop(card_args: list, conn, buff, buff_acc, buff_t, cnt, navg, navg_comp
 
                     navg_completed.value += 1
 
-                i = (cnt.value % lbuff)  # The index inside the real-time buffer.
+                i = (cnt.value % lbuff)  # The index in the real-time buffer.
 
                 if j == 0:
                     buff[i].acquire()
@@ -159,10 +208,10 @@ def daq_loop(card_args: list, conn, buff, buff_acc, buff_t, cnt, navg, navg_comp
                     # Updates the time domain data.
                     npbuff_t[i][:] = data[: nst, 0]
 
-                    # Normalizes the spectrum to power spectral density. 
+                    # Normalizes the spectrum to power spectral density.
                     np.divide(npbuff[i], navg_rt * ns * sr, out=npbuff[i])
 
-                    # Releases the lock so that the new spectrum and 
+                    # Releases the lock so that the new spectrum and
                     # the time domain data can be read by the UI process.
                     buff[i].release()
 
@@ -174,31 +223,31 @@ def daq_loop(card_args: list, conn, buff, buff_acc, buff_t, cnt, navg, navg_comp
                         now = time()
                         delay = (now - tstart) - navg_rt * cnt.value * dt_trace
 
-                        if (trig_mode == "soft" 
-                            and (now - prev_not_time) > RT_NOTIF_INTVL):
+                        if (trig_mode == "soft"
+                                and (now - prev_not_time) > RT_NOTIF_INTVL):
 
-                            # Displays how far the data processing is from 
-                            # the real-time performance. This is only calculated 
-                            # if the trigger is software, because otherwise  
+                            # Displays how far the data processing is from
+                            # the real-time performance. This is only calculated
+                            # if the trigger is software, because otherwise
                             # there are unknown triggering delays.
 
                             print(f"Data processing delay (s): {delay}")
                             prev_not_time = now
 
                         if conn.poll():
-                            # The data acquisition stops when a new message  
-                            # arrives. The trace counter is set to zero because 
-                            # otherwise the reading process that simultaneously 
-                            # resets its own independent counter may be tricked 
-                            # into thinking that it is lagging behind. 
-                            cnt.value = 0 
+                            # The data acquisition stops when a new message
+                            # arrives. The trace counter is set to zero because
+                            # otherwise the reading process that simultaneously
+                            # resets its own independent counter may be tricked
+                            # into thinking that it is lagging behind.
+                            cnt.value = 0
                             break
 
 
 class RtsWindow(QtGui.QMainWindow):
     """A spectrum analyzer with a user interface."""
 
-    def __init__(self, card_args: Sequence = (), 
+    def __init__(self, card_args: Sequence = (),
                  acq_settings: Union[dict, None] = None,
                  fft_lims: tuple = (12, 26),
                  basedir: str = "") -> None:
@@ -220,7 +269,7 @@ class RtsWindow(QtGui.QMainWindow):
                 Defines the limits for the numbers of samples in the trace 
                 that are settable from the user interface, nsamples = 2^n, 
                 where nmin <= n <= nmax. The number of samples is always 2^n
-                to optimize the FFT speed.
+                to optimize the FFT performance.
             basedir:
                 The initial working directory. Once the program is running, 
                 this setting can be changed from the user interface. 
@@ -248,8 +297,8 @@ class RtsWindow(QtGui.QMainWindow):
         self.current_settings = defaults
 
         self.max_disp_rate = 30  # The maximum number of plots per second.
-        self.max_delay = 0.5  # The maximum target delay (s) between 
-                              # the data acquisition and display. This number 
+        self.max_delay = 0.5  # The maximum target delay (s) between
+                              # the data acquisition and display. This number
                               # is not ensured for large traces that take long
                               # to process.
 
@@ -279,11 +328,11 @@ class RtsWindow(QtGui.QMainWindow):
         self.xfd = None
         self.xtd = None
 
-        # Creates a timer that will start a data acquisition process once 
+        # Creates a timer that will start a data acquisition process once
         # the Qt event loop is running.
-        QtCore.QTimer.singleShot(100, self.update_daq) 
+        QtCore.QTimer.singleShot(100, self.update_daq)
 
-        # Starts a timer that will periodically update data displays.
+        # Starts a timer that will periodically update the data displays.
         self.updateTimer = QtCore.QTimer()
         self.updateTimer.timeout.connect(self.update_ui)
         self.updateTimer.start(0)
@@ -299,8 +348,9 @@ class RtsWindow(QtGui.QMainWindow):
         self.resize(1500, 800)
 
         self.ui = RtsWidget()
-        self.setStyleSheet(self.ui.styleSheet())  
+
         # Uses the widget stylesheet for the entire window.
+        self.setStyleSheet(self.ui.styleSheet())
 
         self.setCentralWidget(self.ui)
 
@@ -310,7 +360,7 @@ class RtsWindow(QtGui.QMainWindow):
         for i in range(*fft_lims):
             self.ui.nsamplesComboBox.addItem(f"{2**i:,}", 2**i)
 
-        # Connects to the card, reads the number of channels it has, and 
+        # Connects to the card, reads the number of channels it has, and
         # gets the list of valid channel input ranges, which are required to
         # initialize the corresponding controls.
         with Card(*card_args) as adc:
@@ -323,13 +373,13 @@ class RtsWindow(QtGui.QMainWindow):
 
         self.ui.fullrangeComboBox.clear()
         for r in valid_fullranges_mv:
-            self.ui.fullrangeComboBox.addItem("%g" % (r/1000), int(r)) 
-            # The displayed fullranges are in Volts, but the item data is in mV 
+            self.ui.fullrangeComboBox.addItem("%g" % (r/1000), int(r))
+            # The displayed fullranges are in Volts, but the item data is in mV
             # to keep the values integer.
 
-        self.card_fullranges_mv = [max(valid_fullranges_mv)] * nchannels 
+        self.card_fullranges_mv = [max(valid_fullranges_mv)] * nchannels
         self.card_terminations = ["1M"] * nchannels
-        # While for all other card settings the point of truth is the values of 
+        # While for all other card settings the point of truth is the values of
         # dedicated UI controls, the channel settings are stored in these
         # lists because only the parameters of one channel are displayed in UI
         # at a time.
@@ -356,8 +406,11 @@ class RtsWindow(QtGui.QMainWindow):
             uielem.setCurrentIndex(ch)
 
         with NoSignals(self.ui.fullrangeComboBox) as uielem:
-            fr_mv = int(1000 * acq_settings["fullranges"][0])  # Full range in mV.
-            ind = uielem.findData(fr_mv) 
+
+            # The full range in mV.
+            fr_mv = int(1000 * acq_settings["fullranges"][0])
+
+            ind = uielem.findData(fr_mv)
             uielem.setCurrentIndex(ind)
             self.card_fullranges_mv[ch] = fr_mv
 
@@ -372,7 +425,7 @@ class RtsWindow(QtGui.QMainWindow):
             uielem.setCurrentIndex(ind)
 
         # Connects the control panel.
-        
+
         self.ui.channelComboBox.currentIndexChanged.connect(
             self.change_channel
         )
@@ -401,7 +454,7 @@ class RtsWindow(QtGui.QMainWindow):
 
         # Creates plot lines for the real-time displays.
         self.line = self.ui.spectrumPlot.plot(pen=(250, 0, 0))  # Spectrum.
-        self.line_td = self.ui.scopePlot.plot(pen=(150, 150, 150))  # Time domain.
+        self.line_td = self.ui.scopePlot.plot(pen=(150, 150, 150))  # Time.
 
     def closeEvent(self, event):
         """Executed when the window is closed. This is an overloaded Qt method.
@@ -474,20 +527,20 @@ class RtsWindow(QtGui.QMainWindow):
                 # Acquires a new averaged trace.
                 yfd_avg = self.npbuff_acc / (navg_compl * ns * sr)
 
-                # Makes a copy of the acquisition settings and removes 
-                # the fields that are not very relevant for the end user.
+                # Makes a copy of the acquisition settings and removes
+                # the fields that are not very relevant to the end user.
                 acq_settings = self.current_settings.copy()
                 acq_settings.pop("navg_rt")
                 acq_settings.pop("lbuff")
 
-                data = {"x": self.xfd.copy(), 
+                data = {"x": self.xfd.copy(),
                         "y": yfd_avg,
                         "xlabel": "Frequency (Hz)",
                         "ylabel": "PSD (V^2/Hz)",
                         "n averages": navg_compl,
                         "acquisition": acq_settings}
 
-                # Appends the trace to the list of references, 
+                # Appends the trace to the list of references,
                 # which also displays it in the plot.
                 self.ref_list.append(data, name=f"Ref{len(self.ref_list) + 1}")
 
@@ -510,13 +563,13 @@ class RtsWindow(QtGui.QMainWindow):
         settings["lbuff"] = min(
             max(round(self.max_delay / dt_trace), LBUFF_MIN), LBUFF_MAX)
 
-        if (settings["samplerate"] != self.current_settings["samplerate"] 
+        if (settings["samplerate"] != self.current_settings["samplerate"]
             or settings["nsamples"] != self.current_settings["nsamples"]
             or not self.daq_proc):
-            
+
             # Replace the current number of display averages with an appropriate
             # estimate for new parameters.
-            
+
             # The acquisition rate in traces per second.
             trace_acq_rate = 1 / dt_trace
 
@@ -527,8 +580,8 @@ class RtsWindow(QtGui.QMainWindow):
         self.averging_now = False
 
         # Calculates the required sizes of interprocess buffers.
-        ns_req = settings["nsamples"] 
-        nf_req = ns_req // 2 + 1  
+        ns_req = settings["nsamples"]
+        nf_req = ns_req // 2 + 1
 
         if not self.daq_proc or nf_req > len(self.buff_acc):
             # Starts a new daq process.
@@ -536,19 +589,20 @@ class RtsWindow(QtGui.QMainWindow):
             if self.daq_proc and self.daq_proc.is_alive():
                 self.stop_daq()
 
-            # Allocates buffers for interprocess communication. The frequency 
+            # Allocates buffers for interprocess communication. The frequency
             # domain buffers are fully responsible for synchronization.
-            self.buff = [Array("d", nf_req, lock=True) for _ in range(LBUFF_MAX)]
+            self.buff = [Array("d", nf_req, lock=True)
+                         for _ in range(LBUFF_MAX)]
             self.buff_acc = Array("d", nf_req, lock=False)
-            self.buff_t = [Array("d", ns_req // TDSF, lock=False) 
+            self.buff_t = [Array("d", ns_req // TDSF, lock=False)
                            for _ in range(LBUFF_MAX)]
 
             self.pipe_conn, conn2 = Pipe()
 
             self.daq_proc = Process(target=daq_loop,
-                                    args=(self.card_args, conn2, 
-                                          self.buff, self.buff_acc, self.buff_t, 
-                                          self.w_cnt, self.navg, 
+                                    args=(self.card_args, conn2,
+                                          self.buff, self.buff_acc, self.buff_t,
+                                          self.w_cnt, self.navg,
                                           self.navg_completed),
                                     daemon=True)
             self.daq_proc.start()
@@ -567,13 +621,13 @@ class RtsWindow(QtGui.QMainWindow):
 
         if ns != self.current_settings["nsamples"] or not self.npbuff:
             # Formats the buffers for the actual number of samples.
-            
-            self.npbuff = [np.ndarray((nf,), dtype=np.float64, buffer=a.get_obj())
-                           for a in self.buff]
-            self.npbuff_acc = np.ndarray((nf,), dtype=np.float64, 
+
+            self.npbuff = [np.ndarray((nf,), dtype=np.float64, 
+                                      buffer=a.get_obj()) for a in self.buff]
+            self.npbuff_acc = np.ndarray((nf,), dtype=np.float64,
                                          buffer=self.buff_acc)
-            self.npbuff_t = [np.ndarray((nst,), dtype=np.float64, buffer=a) 
-                            for a in self.buff_t]
+            self.npbuff_t = [np.ndarray((nst,), dtype=np.float64, buffer=a)
+                             for a in self.buff_t]
 
         settings.update(msg)
         self.current_settings = settings
@@ -592,10 +646,10 @@ class RtsWindow(QtGui.QMainWindow):
         df = (sr / ns)
         self.ui.rbwLabel.setText("%.2f" % df)
 
-         # Calculates the frequency axis for the spectrum plot.
+        # Calculates the frequency axis for the spectrum plot.
         self.xfd = np.arange(0, nf) * df
-        
-        rng = settings["fullranges"][0] 
+
+        rng = settings["fullranges"][0]
         tmax = nst / sr
         self.xtd = np.linspace(0, tmax, nst)
 
@@ -635,7 +689,7 @@ class RtsWindow(QtGui.QMainWindow):
         ch = self.ui.channelComboBox.currentData()
         term = self.ui.terminationComboBox.currentData()
 
-        # The item data of fullrangeComboBox is in millivolts, 
+        # The item data of fullrangeComboBox is in millivolts,
         # it needs to be converted to volts.
         frng = self.ui.fullrangeComboBox.currentData() / 1000
 
@@ -710,8 +764,8 @@ class RtsWindow(QtGui.QMainWindow):
 
         # Sets the y range based on the estimated digitalization noise.
         vrms = 2 * self.current_settings["fullranges"][0] / 2**16
-        lev = np.log10(vrms**2 / fmax)
-        self.ui.spectrumPlot.setYRange(lev - 1, lev + 11)
+        noise_lev = np.log10(vrms**2 / fmax)
+        self.ui.spectrumPlot.setYRange(noise_lev - 1, noise_lev + 11)
 
         # Makes the scope plot and the trace widget to be of the same width
         # which makes them look nicer.
@@ -746,9 +800,9 @@ class RtsWidget(QtGui.QWidget, Ui_RtsWidget):
         self.spectrumPlot.setBackground("w")
         self.spectrumPlot.setClipToView(True)
 
-        # This setting turns on resampling the data before display to avoid 
+        # This setting turns on resampling the data before display to avoid
         # plotting multiple line segments per pixel.
-        self.spectrumPlot.setDownsampling(auto=True) 
+        self.spectrumPlot.setDownsampling(auto=True)
 
         self.spectrumPlot.setLabel("left", "PSD", units="")
         self.spectrumPlot.setLabel("bottom", "Frequency", units="Hz")
@@ -762,7 +816,7 @@ class RtsWidget(QtGui.QWidget, Ui_RtsWidget):
 
         self.scopePlot.setBackground("w")
         self.scopePlot.setClipToView(True)
-        self.scopePlot.setDownsampling(auto=True) 
+        self.scopePlot.setDownsampling(auto=True)
         self.scopePlot.setLabel("left", "Input", units="V")
         self.scopePlot.setLabel("bottom", "Time", units="s")
         self.scopePlot.showAxis("right")
@@ -770,10 +824,13 @@ class RtsWidget(QtGui.QWidget, Ui_RtsWidget):
         self.scopePlot.getAxis("top").setStyle(showValues=False)
         self.scopePlot.getAxis("right").setStyle(showValues=False)
 
-def rts(*args, **kwargs):
-    """Starts a real-time spectrum analyzer."""
 
-    # Same as app = QtGui.QApplication(*args) with optimum parameters
+def rts(*args, **kwargs):
+    """Starts a real-time spectrum analyzer. For the list of arguments,
+    see the constructor of `RtsWindow`.
+    """
+
+    # Same as app = QtGui.QApplication(*args) with optimized parameters
     app = mkQApp()
 
     mw = RtsWindow(*args, **kwargs)
@@ -826,13 +883,13 @@ def add_array_parallel(a, b):
 def calc_psd(a, b):
     """Calculated one-sided power spectral density from an FFT in `b` 
     and stores the result in `a`.
-    
+
     a[0] = abs(b[0])**2,
     a[i] = 2*abs(b[i])**2  if  i > 0.
     """
     for i in range(a.shape[0]):
         a[i] = 2 * (b[i].real ** 2 + b[i].imag ** 2)
-    
+
     a[0] = b[0].real ** 2 + b[0].imag ** 2
 
 
