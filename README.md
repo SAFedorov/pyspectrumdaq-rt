@@ -1,31 +1,32 @@
+<img width="120" height="120" src="rsc/psd_icon.png">
+
 # pyspectrumdaq-rts
 
-A package for data acquisition using [Spectrum Instrumentation](https://spectrum-instrumentation.com/) digitizer cards, 
-which supplements Ivan Galinskiy's `pyspectrumdaq` with capabilities 
-for real-time data streaming and adds a real-time spectrum analyzer app based on Qt UI. 
+A package for data acquisition using [Spectrum Instrumentation](https://spectrum-instrumentation.com/) digitizer cards with a real-time spectrum analyzer app. It extends Ivan Galinskiy's `pyspectrumdaq` by continuous data streaming capabilities and a Qt UI.
 
 Supports multi-channel acquisition, external triggering and clocking, etc.
 
 ## Requirements
 
-Console usage requires:
+Command-line usage requires:
 * numpy
 * numba
 
-Running the spectrum analyzer app, in addition, requires:
+Running the spectrum analyzer app also requires:
 * pyqtgraph
 * pyfftw
 * h5py
 
 The software was tested with a M2i.4931-Exp card and pyqtgraph 0.11.0.
 
+Real-time data streaming and FFT calculation at high sampling rates demand some comutational power from the host computer. A 2.5 GHz 4-core CPU should be borderline enough for 30 MS/s rates (which gives 15 MHz Nyquist bandwidth).  
+
 ## Installation
 
 The project contains a python package that can be installed from the terminal as normal:
 
-1) Download the project folder locally, e.g. as C:\User\Downloads\pyspectrumdaq-rts 
-2) Run `pip install C:\User\Downloads\pyspectrumdaq-rts` or navigate the
-   terminal to the project folder and run `pip install .`
+1) Download the project folder locally 
+2) Navigate the terminal to the project folder and execute either `pip install .` , in which case the command will copy the files to the standard location of python packages, or `pip install . -e` , in which the command will reference the files in the current directory. 
 
 ## Usage examples
 
@@ -39,14 +40,15 @@ if __name__ == "__main__":
     # The spectrum analyzer uses multiprocessing, so the
     # if __name__ == "__main__" idiom is required.
 
-    # basedir is the default directory for saving traces. This is
-    # a convenience setting that can be changed later in the UI.
-    # acq_settings are passed to Card.set_acquisition
-    # The UI only works with one channel at a time at the moment.
+    # basedir is the default directory for saving traces. It can be changed 
+    # later in the UI. acq_settings are passed to Card.set_acquisition
+    # The app only works with one channel at a time at the moment.
     rts(basedir="home", acq_settings={channels: (0,), fullranges=(10,)})
 ```
+The look of the UI:
+![ui with dummy card](rsc/rts_dummy_card.png)
 
-### Console usage
+### Command line usage
 
 Simultaneously acquiring one data trace from each of the four channels:
 
@@ -71,8 +73,8 @@ with Card() as adc:
     t = [i/adc.samplerate for i in range(ns)] 
 ```
 
-Multiple traces can be acquired by repeatedly calling `adc.acquire()` in a loop,
-no reconfiguration is needed between the acquisitions.
+Multiple traces can be acquired by repeatedly calling `adc.acquire()` in a loop.
+No reconfiguration is needed between acquisitions.
 
 In order not to miss samples between traces, one can acquire data in FIFO mode:
 ```python
