@@ -43,7 +43,8 @@ if __name__ == "__main__":
     # basedir is the default directory for saving traces. It can be changed 
     # later in the UI. acq_settings are passed to Card.set_acquisition
     # The app only works with one channel at a time at the moment.
-    rts(basedir="home", acq_settings={channels: (0,), fullranges=(10,)})
+    rts(basedir="home", acq_settings={"channels": (0,), "fullranges": (10,),
+                                      "terminations": ("1M",), "samplerate": 30e6})
 ```
 The look of the UI:
 ![ui with dummy card](rsc/rts_dummy_card.png)
