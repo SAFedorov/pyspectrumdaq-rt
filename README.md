@@ -100,7 +100,7 @@ The FIFO mode can also be used for indefinitely long real-time data streaming by
 ```
 
 ### Digital demodulation
-While digitalization at the full sampling frequency can produce high volumes of data, sometimes the signals of interest are contained within a narrow spectral region. This spectral region can be selected via digital demodulation and followed by low-pass filtering, which reduces the amount of data to be processed and saved. 
+While digitalization at the full sampling frequency can produce high volumes of data, sometimes the signals of interest are contained within a narrow spectral region. This spectral region can be selected via digital demodulation followed by low-pass filtering, which reduces the amount of data to be processed and saved. 
 
 ```python
 import numpy as np
