@@ -98,3 +98,48 @@ The FIFO mode can also be used for indefinitely long real-time data streaming by
     for data in adc.fifo():
         pass
 ```
+
+### Digital demodulation
+While digitalization at the full sampling frequency can produce high volumes of data, sometimes the signals of interest are contained within a narrow spectral region. This spectral region can be selected via digital demodulation and followed by low-pass filtering, which reduces the amount of data to be processed and saved. 
+
+```python
+import numpy as np
+from scipy import signal
+
+nsamples = 3 * 10**5
+samplerate = 15 * 10**6
+fdemod = 0.93e6  # demodulation frequency
+flp = 10**5  # demodulation lowpass cutoff
+
+# Makes a filter
+sos = signal.butter(6, flp, btype="lowpass", fs=samplerate, output="sos", 
+                    analog=False)
+
+samplerate_ratio = samplerate // (6 * flp)
+dt = 1/samplerate
+
+# The time stamps for the data record
+t = np.array([i*dt for i in range(nsamples)]) 
+
+# The demodulation exponential
+exp_tr = np.exp(2j * pi * fdemod * t)
+
+with Card() as adc:
+    adc.set_acquisition(mode="std_single",
+                        channels=[1], 
+                        terminations=["50"], 
+                        fullranges=[2],
+                        pretrig_ratio=0.0, 
+                        nsamples=nsamples,
+                        samplerate=samplerate)             
+    adc.set_trigger(mode="soft")
+
+    # Acquires one raw data trace
+    sig = adc.acquire()[:, 0]
+    
+    # Demodulates, filters and downsamples
+    demod_sig = sig * exp_tr
+    filtered_sig = signal.sosfilt(sos, demod_sig)[::samplerate_ratio]
+    # The interval between the time stamps for filtered_sig 
+    # is dt * samplerate_ratio
+```
