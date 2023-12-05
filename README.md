@@ -1,8 +1,8 @@
-<img width="120" height="120" src="rsc/psd_icon.png">
+<p align="center">
+    <img width="500" src="rsc/psd_header.png">
+</p>
 
-# pyspectrumdaq-rts
-
-A package for data acquisition using [Spectrum Instrumentation](https://spectrum-instrumentation.com/) digitizer cards with a real-time spectrum analyzer app. It extends Ivan Galinskiy's `pyspectrumdaq` by continuous data streaming capabilities and a Qt UI.
+The package implements a data acquisition interface for [Spectrum Instrumentation](https://spectrum-instrumentation.com/) digitizer cards and includes a real-time spectrum analyzer app. It extends Ivan Galinskiy's `pyspectrumdaq` by continuous data streaming capabilities and a Qt UI.
 
 Supports multi-channel acquisition, external triggering and clocking, etc.
 
@@ -13,11 +13,11 @@ Command-line usage requires:
 * numba
 
 Running the spectrum analyzer app also requires:
-* pyqtgraph
+* pyqtgraph 0.11.0
 * pyfftw
 * h5py
 
-The software was tested with a M2i.4931-Exp card and pyqtgraph 0.11.0.
+The software was tested with a M2i.4931-Exp card.
 
 Real-time data streaming and FFT calculation at high sampling rates demand some comutational power from the host computer. A 2.5 GHz 4-core CPU should be borderline enough for 30 MS/s rates (which gives 15 MHz Nyquist bandwidth).  
 
@@ -32,16 +32,16 @@ The project contains a python package that can be installed from the terminal as
 
 ### Spectrum analyzer
 
-Starting the real-time spectrum analyzer app:
+Starting the real-time spectrum analyzer (RTS) app:
 ```python
 from pyspectrumdaq import rts
 
 if __name__ == "__main__":
     # The spectrum analyzer uses multiprocessing, so the
-    # if __name__ == "__main__" idiom is required.
+    # if __name__ == "__main__" idiom is required in the file that starts it.
 
     # basedir is the default directory for saving traces. It can be changed 
-    # later in the UI. acq_settings are passed to Card.set_acquisition
+    # later in the UI. Most of acq_settings are passed to Card.set_acquisition
     # The app only works with one channel at a time at the moment.
     rts(basedir="home", acq_settings={"channels": (0,), "fullranges": (10,),
                                       "terminations": ("1M",), "samplerate": 30e6})
@@ -49,9 +49,9 @@ if __name__ == "__main__":
 The look of the UI:
 ![ui with dummy card](rsc/rts_dummy_card.png)
 
-### Command line usage
+### Baseband data acquisition
 
-Simultaneously acquiring one data trace from each of the four channels:
+The code for concurrent acquisition of one data trace from each of the four input channels:
 
 ```python
 from pyspectrumdaq import Card
@@ -76,6 +76,7 @@ with Card() as adc:
 
 Multiple traces can be acquired by repeatedly calling `adc.acquire()` in a loop.
 No reconfiguration is needed between acquisitions.
+The number of samples missed between traces will be small but random.
 
 In order not to miss samples between traces, one can acquire data in FIFO mode:
 ```python
@@ -92,8 +93,7 @@ with Card() as adc:
     # Acquires 100 traces with no missed samples in between.
     data_list = [data[:, 0] for data in adc.fifo(100)]
 ```
-The FIFO mode can also be used for indefinitely long real-time streaming of 
-data by omitting the numerical argument to the method:
+The FIFO mode can also be used for indefinitely long real-time data streaming by omitting the numerical argument to the method:
 ```python
     for data in adc.fifo():
         pass
