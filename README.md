@@ -2,7 +2,7 @@
     <img width="500" src="rsc/psd_header.png">
 </p>
 
-The package implements a data acquisition interface for [Spectrum Instrumentation](https://spectrum-instrumentation.com/) digitizer cards and includes a real-time spectrum analyzer app. It extends Ivan Galinskiy's [pyspectrumdaq](https://github.com/quantop-dungeon/pyspectrumdaq) by continuous data streaming capabilities and a Qt UI.
+The package implements a data acquisition interface for [Spectrum Instrumentation](https://spectrum-instrumentation.com/) digitizer cards and includes a real-time spectrum analyzer app. A derivative of Ivan Galinskiy's [pyspectrumdaq](https://github.com/quantop-dungeon/pyspectrumdaq), it extends the original by continuous data streaming capabilities and a Qt UI.
 
 Supports multi-channel acquisition, external triggering and clocking, etc.
 
