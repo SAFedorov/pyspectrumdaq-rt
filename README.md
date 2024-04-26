@@ -26,7 +26,7 @@ Real-time data streaming and FFT calculation at high sampling rates demand some 
 The project contains a python package that can be installed from the terminal as normal:
 
 1) Download the project folder locally 
-2) Navigate the terminal to the project folder and execute either `pip install .` , in which case the command will copy the files to the standard location of python packages, or `pip install . -e` , in which the command will reference the files in the current directory. 
+2) Navigate the terminal to the project folder and execute either `pip install .` , in which case the command will copy the files to the standard location of python packages, or `pip install -e .` , in which the command will reference the files in the current directory. 
 
 ## Usage examples
 
