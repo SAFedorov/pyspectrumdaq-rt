@@ -49,7 +49,46 @@ if __name__ == "__main__":
 The look of the UI:
 ![ui with dummy card](rsc/rts_dummy_card.png)
 
-### Baseband data acquisition
+New traces can be acquired by pressing Average button, and the selected trace is saved in the base directory by pressing `ctrl-s`. 
+
+The content of the saved hdf5 file includes the values of the power spectral density at each frequency, the limits necessary to recreate the frequency axis, and some additional metadata. The spectra can be loaded as
+```python
+import h5py
+import numpy as np
+
+with h5py.File("data_file.hdf5", "r") as f:
+    psd = f["ydata"][:]  # The slicing is to convert it to a numpy array.
+    fmin = f["ydata"].attrs["xmin"]
+    fmax = f["ydata"].attrs["xmax"]
+
+freqs = np.linspace(fmin, fmax, len(psd))
+```
+Inspecting the metadata,
+```python
+
+with h5py.File(data_filename, "r") as f:
+    mdt = dict(f["ydata"].attrs)
+    for k in mdt:
+        print(f"{k}: {mdt[k]}")
+```
+one can see something something like
+```
+acquisition:channels: [1]
+acquisition:fullranges: [0.5]
+acquisition:mode: fifo_single
+acquisition:nsamples: 524288
+acquisition:samplerate: 30000000
+acquisition:terminations: ['50']
+acquisition:trig_mode: soft
+acquisition:window: Hann
+n averages: 1000
+xlabel: Frequency (Hz)
+xmax: 15000000.0
+xmin: 0.0
+ylabel: PSD (V^2/Hz)
+```
+
+### Baseband data acquisition from a script or notebook
 
 The code for concurrent acquisition of one data trace from each of the four input channels:
 
