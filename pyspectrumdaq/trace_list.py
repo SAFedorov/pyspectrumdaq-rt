@@ -10,6 +10,7 @@ from pyqtgraph.Qt import QtCore
 from pyqtgraph.Qt import QtGui
 from pyqtgraph.Qt import QtWidgets 
 
+
 class TraceList:
     """A class that manages a combination of a list widget, pyqtgraph plot
     and directory edit field to plot traces, edit their names,
@@ -53,7 +54,6 @@ class TraceList:
         # The colors are not implemented as a geneerator because 
         # the index is decremented sometimes.
         
-
     def __len__(self):
         return len(self._list)
 
@@ -61,7 +61,7 @@ class TraceList:
         return self._list[ind]["xytrace"]
 
     def append(self, xytrace: dict, name: str = '') -> None:
-        """Adds a new item to the list, creates and entry in the list widget
+        """Adds a new item to the list, creates an entry in the list widget
         and displays it in the plot.
 
         Args:
@@ -101,7 +101,6 @@ class TraceList:
                            "line": line, 
                            "line_color": line_color,
                            "is_visible": True})
-
 
     def toggle_visibility(self) -> None:
         """Sets or toggles the visibility of the current trace in the plot."""
