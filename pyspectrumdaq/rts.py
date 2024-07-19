@@ -28,7 +28,7 @@ from .trace_list import TraceList
 from .card import Card
 
 
-TDSF = 100  # The shrinking factor for time-domain data.
+TDSF = 1  # The shrinking factor for time-domain data.
 
 COMM_POLL_INTVL = 0.5  # The period (in seconds) with which the data acquisition
                        # process checks if new settings were supplied from 
