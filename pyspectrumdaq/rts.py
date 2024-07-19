@@ -565,20 +565,18 @@ class RtsWindow(QtGui.QMainWindow):
 
         if (settings["samplerate"] != self.current_settings["samplerate"]
             or settings["nsamples"] != self.current_settings["nsamples"]
+            or settings["trig_mode"] != self.current_settings["trig_mode"]
             or not self.daq_proc):
 
             # Replace the current number of display averages with an appropriate
-            # estimate for new parameters.
+            # estimate for new parameters. The "if" check protects the number
+            # of averages from being overwritten when it is set from the user 
+            # interface.
 
             # The acquisition rate in traces per second.
             trace_acq_rate = 1 / dt_trace
 
-            if settings["trig_mode"] == "soft":
-                # In the case of continuous acquisition, sets the display rate
-                # to roughly match the prescribed value.
-
-                settings["navg_rt"] = ceil(trace_acq_rate / self.max_disp_rate)
-            else:
+            if settings["trig_mode"] == "ext":
                 # With external triggering, the rate at which traces arrive
                 # is unknown to the software, so the number of averages needed
                 # to achieve a certain display rate is unknown. To be safe
@@ -587,6 +585,11 @@ class RtsWindow(QtGui.QMainWindow):
                 # the user from the UI.
                 
                 settings["navg_rt"] = 1
+            else:
+                # In the case of continuous acquisition, sets the display rate
+                # to roughly match the prescribed value.
+
+                settings["navg_rt"] = ceil(trace_acq_rate / self.max_disp_rate)
 
         self.r_cnt = 0
         self.disp_buff_overflow = False
