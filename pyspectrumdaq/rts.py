@@ -264,7 +264,7 @@ class RtsWindow(QtGui.QMainWindow):
             acq_settings:
                 A dictionary of acquisition settings. Can be used to pass to
                 the card settings that are not accessible from the user 
-                interface.
+                interface. See the function body for the defaults.
             fft_lims ((nmin, nmax)):
                 Defines the limits for the numbers of samples in the trace 
                 that are settable from the user interface, nsamples = 2^n, 

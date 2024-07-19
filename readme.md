@@ -182,3 +182,5 @@ with Card() as adc:
     # The interval between the time stamps for filtered_sig 
     # is dt * samplerate_ratio
 ```
+### More
+See the files in the [examples](examples) folder.

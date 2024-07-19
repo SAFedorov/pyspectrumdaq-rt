@@ -103,7 +103,7 @@ def psdcorr(traces: list, dt: float = 1., window: str = "Hann") -> tuple:
 
 
 def defaults() -> dict:
-    """Default card settings."""
+    """Default acquisition settings."""
 
     settings = dict(mode="std_single",
                     channels=[1],           # Numbers of the active DAQ channel.
