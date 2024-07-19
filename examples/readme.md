@@ -6,5 +6,6 @@ The content of this folder:
     traces, dt = acq(10)
     freq, psd = psd(traces, dt)
     ```
+* `daq_usage.ipynb` - a jupyter notebook that illustrates the usage of `daq.py`
 * `spectrum_analyzer.py` - a script to start the spectrum analyzer app with a pre-set configuration.
 * `Sepctrum.bat` - a bat file to call `spectrum_analyzer.py` from windows desktop, assuming `pyspectrumdaq` package is installed on an anaconda environment `myenv` of the user `UserName`.
