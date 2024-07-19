@@ -42,11 +42,11 @@ def psd(traces: list, dt: float = 1., window: str = "Hann") -> tuple:
         sp += np.abs(np.fft.ifft(tr, axis=-1))**2  
         # Inverse FFT is to be consistent with the physicist's convention.
     
-    sp = sp/(len(traces) * nf)
-    sp = np.concatenate((sp[nf//2+1:], sp[:nf//2+1]))
+    sp = sp * nf * dt / len(traces)
+    sp = np.concatenate((sp[..., nf//2+1:], sp[..., :nf//2+1]), axis=-1)
     
     # Frequency axis in Hz.
-    fs = np.array([i/(nf*dt) for i in range(-nf//2, nf//2)])
+    fs = np.array([i / (nf * dt) for i in range(-nf//2, nf//2)])
     
     return (fs, *sp)
 
@@ -81,7 +81,7 @@ def psdcorr(traces: list, dt: float = 1., window: str = "Hann") -> tuple:
     nf = ns  # The number of frequency bins is the same 
              # as the number of samples.
     sp = np.zeros((2, nf))
-    corr = np.zeros((nf,))
+    corr = np.zeros((nf,), dtype=np.complex128)
     
     for tr in traces:
         ft = np.fft.ifft(tr, axis=-1)
@@ -90,16 +90,26 @@ def psdcorr(traces: list, dt: float = 1., window: str = "Hann") -> tuple:
         sp += np.abs(ft)**2
         corr += ft[0].conj() * ft[1]
     
-    sp = sp/(len(traces) * nf)
-    sp = np.concatenate((sp[nf//2+1:], sp[:nf//2+1]))
+    sp = sp * nf * dt / len(traces)
+    sp = np.concatenate((sp[..., nf//2+1:], sp[..., :nf//2+1]), axis=-1)
 
-    corr = corr/(len(traces) * nf)
-    corr = np.concatenate((corr[nf//2+1:], corr[:nf//2+1]))
+    corr = corr * nf * dt / len(traces)
+    corr = np.concatenate((corr[..., nf//2+1:], corr[..., :nf//2+1]), axis=-1)
     
     # Frequency axis in Hz.
-    fs = np.array([i/(nf*dt) for i in range(-nf//2, nf//2)])
+    fs = np.array([i / (nf * dt) for i in range(-nf//2, nf//2)])
     
     return (fs, sp[0], sp[1], corr)
+
+
+def psd2to1sided(f, s):
+    """Converts a two-sided power spectral density `s` to one-sided format. 
+    `f` is the frequency axis. Returns a tuple `(f_one_sided, s_one_sided)`."""
+
+    f_os = f[-len(f)//2 - 1 :]
+    s_os = 2 * s[-len(f)//2 - 1 :]
+    s_os[0] = s_os[0] / 2
+    return (f_os, s_os)
 
 
 def defaults() -> dict:
@@ -110,7 +120,7 @@ def defaults() -> dict:
                     terminations=["50"],    # Channel terminations.
                     fullranges=[2],         # Channel full ranges.
                     pretrig_ratio=0.,       # No data from prior to the trigger. 
-                    nsamples=100 * 10**6,   # Number of samples in a trace.
+                    nsamples=10**6,   # Number of samples in a trace.
                     samplerate=15 * 10**6,  # DAQ sampling rate.
                     trig_mode="soft")       # Trigger. Use "soft" for 
                                             # free-running acquisition and "ext"
@@ -153,23 +163,23 @@ def acq(n: int,
             sig = adc.acquire().T  # shape (nchannels, nsamples)
             traces.append(sig)
         
-        if save:    
-            # Saves the data in an HDF5 file in the current directory. 
-            file_name = str(datetime.now()).replace(':', '-') + ".h5"
-            with h5py.File(file_name, "w") as f:
-                f["ydata"] = np.array(traces)
-                f["ydata"].attrs["xmin"] = 0
-                f["ydata"].attrs["dx"] = dt
-                f["ydata"].attrs["ntraces"] = n
-                
-        return traces
+    if save:    
+        # Saves the data in an HDF5 file in the current directory. 
+        file_name = str(datetime.now()).replace(':', '-') + ".h5"
+        with h5py.File(file_name, "w") as f:
+            f["ydata"] = np.array(traces)
+            f["ydata"].attrs["xmin"] = 0
+            f["ydata"].attrs["dx"] = dt
+            f["ydata"].attrs["ntraces"] = n
+            
+    return traces, dt
 
 
 def acqdemod(n: int, 
              save: bool = False, 
              fdemod: float = 0.94e6,
              flp: float = 10**5,
-             plotfft: bool = True, 
+             plotfft: bool = False, 
              settings: Union[dict, None] = None) -> list:
     
     """Acquires `n` demodulated traces from the card initialized with `settings` 
@@ -212,7 +222,7 @@ def acqdemod(n: int,
         t = np.array([i * dt for i in range(nsamples)]) 
         exp_tr = np.exp(2j * pi * fdemod * t)
         
-        samplerate_ratio = samplerate // (6 * flp)
+        samplerate_ratio = int(samplerate // (6 * flp))
         traces = []
         
         for _ in range(n):
@@ -221,23 +231,39 @@ def acqdemod(n: int,
             # Demodulates, filters and downsamples.
             sig = sig * exp_tr
             sig = signal.sosfilt(sos, sig, axis=-1)
-            sig = sig[:, ::samplerate_ratio]
+            sig = sig[..., ::samplerate_ratio]
             
             traces.append(sig)
         
-        dt_ds = dt * samplerate_ratio
+    dt_ds = dt * samplerate_ratio
 
-        if save:    
-            # Saves the data in an HDF5 file in the current directory. 
-            file_name = str(datetime.now()).replace(':', '-') + " demod.h5"
-            with h5py.File(file_name, "w") as f:
-                f["ydata"] = np.array(traces)
-                f["ydata"].attrs["xmin"] = 0
-                f["ydata"].attrs["dx"] = dt_ds
-                f["ydata"].attrs["ntraces"] = n
-        
-        if plotfft:            
-            plt.plot(*psd(traces, dt=dt_ds))
-            plt.yscale("log")
-                
-        return traces, dt_ds
+    if save:    
+        # Saves the data in an HDF5 file in the current directory. 
+        file_name = str(datetime.now()).replace(':', '-') + " demod.h5"
+        with h5py.File(file_name, "w") as f:
+            f["ydata"] = np.array(traces)
+            f["ydata"].attrs["xmin"] = 0
+            f["ydata"].attrs["dx"] = dt_ds
+            f["ydata"].attrs["ntraces"] = n
+    
+    if plotfft:
+        freq, *sp = psd(traces, dt=dt_ds)          
+        for s in sp:
+            plt.plot(freq, s)
+            
+        plt.yscale("log")
+            
+    return traces, dt_ds
+
+
+def loadh5(path):
+    """Loads a spectrum saved in an hdf5 from the spectrum analyzer UI."""
+
+    with h5py.File(path, "r") as f:
+        psd = f["ydata"][:]  # The slicing is to convert it to a numpy array.
+        fmin = f["ydata"].attrs["xmin"]
+        fmax = f["ydata"].attrs["xmax"]
+
+    freqs = np.linspace(fmin, fmax, len(psd))
+
+    return (freqs, psd)
