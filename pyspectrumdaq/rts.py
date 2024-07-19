@@ -573,7 +573,20 @@ class RtsWindow(QtGui.QMainWindow):
             # The acquisition rate in traces per second.
             trace_acq_rate = 1 / dt_trace
 
-            settings["navg_rt"] = ceil(trace_acq_rate / self.max_disp_rate)
+            if settings["trig_mode"] == "soft":
+                # In the case of continuous acquisition, sets the display rate
+                # to roughly match the prescribed value.
+
+                settings["navg_rt"] = ceil(trace_acq_rate / self.max_disp_rate)
+            else:
+                # With external triggering, the rate at which traces arrive
+                # is unknown to the software, so the number of averages needed
+                # to achieve a certain display rate is unknown. To be safe
+                # and prevent the user interface from lagging, the number of
+                # averaged is set to 1, to be possibly later changed by
+                # the user from the UI.
+                
+                settings["navg_rt"] = 1
 
         self.r_cnt = 0
         self.disp_buff_overflow = False
